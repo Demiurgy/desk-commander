@@ -21,10 +21,10 @@ body {
 .card h2 .count { margin-left:auto; font-weight:600; color:#b0aa9e; text-transform:none; letter-spacing:0; }
 
 /* ---- TOP GRID: schedule (left) + hero (right) ---- */
-.topgrid { display:grid; grid-template-columns:minmax(0,0.92fr) minmax(0,1.08fr); gap:16px; align-items:start; margin-bottom:16px; }
+.topgrid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:16px; align-items:stretch; margin-bottom:16px; }
 .schedule-card { margin-bottom:0; border-color:#c9d6f0; }
 .schedule-card h2 { justify-content:center; }
-.hero { padding-top:6px; }
+.hero { margin-bottom:0; display:flex; flex-direction:column; justify-content:center; }
 .hello { font-size:46px; line-height:1.02; font-weight:800; letter-spacing:-0.03em; }
 .today-date { color:#8a857c; font-size:18px; margin-top:8px; text-transform:capitalize; }
 .hero .addrow { margin-top:20px; margin-bottom:0; }
@@ -114,19 +114,19 @@ footer.note { text-align:center; color:#b0aa9e; font-size:12px; margin-top:22px;
 <body>
 <div class="wrap">
 
-  <!-- TOP: schedule (left) + hero greeting/input (right) -->
+  <!-- TOP: hero greeting/input (left) + schedule (right) -->
   <div class="topgrid">
-    <div class="card schedule-card">
-      <h2>Ближайшие события</h2>
-      <div id="schedule"><div class="spinner">Загружаю события…</div></div>
-    </div>
-    <div class="hero">
+    <div class="hero card">
       <div class="hello" id="hello">Привет.</div>
       <div class="today-date" id="todayDate"></div>
       <div class="addrow">
         <input id="newTask" placeholder="Что нужно сделать?">
         <button onclick="addManual()">+</button>
       </div>
+    </div>
+    <div class="card schedule-card">
+      <h2>Ближайшие события</h2>
+      <div id="schedule"><div class="spinner">Загружаю события…</div></div>
     </div>
   </div>
 
