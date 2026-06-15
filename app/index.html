@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Рабочий стол — движок задач</title>
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body {
+  margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:#f5f4f0; color:#1f1d1a; -webkit-font-smoothing:antialiased;
+}
+.wrap { max-width:1080px; margin:0 auto; padding:26px 20px 70px; }
+header.top { margin-bottom:20px; }
+.hello { font-size:25px; font-weight:700; letter-spacing:-0.02em; }
+.today-date { color:#8a857c; font-size:15px; margin-top:4px; text-transform:capitalize; }
+
+.card { background:#fff; border:1px solid #e7e3da; border-radius:16px; padding:18px; margin-bottom:16px; }
+.card h2 {
+  margin:0 0 14px; font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+  color:#6f6a61; display:flex; align-items:center; gap:8px;
+}
+.card h2 .count { margin-left:auto; font-weight:600; color:#b0aa9e; text-transform:none; letter-spacing:0; }
+
+/* agents */
+.agents { display:flex; flex-wrap:wrap; gap:8px; }
+.agent-btn {
+  font:inherit; font-size:13px; font-weight:600; cursor:pointer;
+  border:1px solid #e0dbd1; background:#fafaf8; color:#1f1d1a;
+  padding:9px 13px; border-radius:11px; display:inline-flex; align-items:center; gap:7px; transition:.12s;
+}
+.agent-btn:hover { background:#fff; border-color:#cfc8bc; transform:translateY(-1px); }
+.agent-btn:disabled { opacity:.55; cursor:wait; }
+.agent-btn .em { font-size:15px; }
+.agent-hint { font-size:12px; color:#a39d92; margin-top:10px; }
+
+/* add task */
+.addrow { display:flex; gap:6px; margin-bottom:14px; }
+.addrow input {
+  flex:1; font:inherit; padding:9px 11px; border:1px solid #e0dbd1; border-radius:10px; background:#fafaf8; min-width:0;
+}
+.addrow button, .btn {
+  font:inherit; font-weight:600; font-size:13px; padding:9px 14px; border:none; border-radius:10px;
+  background:#1f1d1a; color:#fff; cursor:pointer;
+}
+.addrow button:hover,.btn:hover{ background:#3a362f; }
+
+/* filters */
+.filters { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+.chip {
+  font-size:12px; font-weight:600; padding:4px 11px; border-radius:20px; cursor:pointer;
+  border:1px solid #e7e3da; background:#fff; color:#6f6a61;
+}
+.chip.active { background:#1f1d1a; color:#fff; border-color:#1f1d1a; }
+
+/* tasks */
+.tasks { list-style:none; margin:0; padding:0; }
+.task { padding:12px 0; border-top:1px solid #f0ede6; }
+.task:first-child { border-top:none; }
+.task .main { display:flex; gap:11px; align-items:flex-start; }
+.task .chk {
+  flex:0 0 22px; width:22px; height:22px; margin-top:1px; border:1.5px solid #ddd7cc; border-radius:7px;
+  cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#fff; background:#fff;
+}
+.task .chk.on { background:#4a9d5b; border-color:#4a9d5b; }
+.task .body { flex:1; min-width:0; }
+.task .title { font-size:15px; line-height:1.35; }
+.task .title.done { text-decoration:line-through; color:#b0aa9e; }
+.task .tags { margin-top:5px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.dchip { font-size:11px; font-weight:600; padding:1px 8px; border-radius:20px; }
+.src { font-size:11px; color:#a39d92; }
+.src.agent { color:#7b53c9; font-weight:600; }
+.task .acts { display:flex; gap:6px; align-items:center; }
+.iconbtn { font:inherit; font-size:12px; font-weight:600; cursor:pointer; border:1px solid #e0dbd1; background:#fafaf8; color:#3a362f; padding:5px 9px; border-radius:8px; white-space:nowrap; }
+.iconbtn:hover { background:#fff; }
+.iconbtn.sched { color:#2f8f46; }
+.del { color:#cfc8bc; cursor:pointer; font-size:18px; padding:0 2px; line-height:1; }
+.del:hover { color:#c0392b; }
+.scheduled-note { font-size:12px; color:#2f8f46; font-weight:600; }
+
+/* inline scheduler */
+.sched-form { margin-top:10px; padding:11px; background:#f7f9f7; border:1px solid #dcebdf; border-radius:11px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.sched-form input { font:inherit; padding:6px 9px; border:1px solid #cfdccf; border-radius:8px; background:#fff; }
+.sched-form .lbl { font-size:12px; color:#6f6a61; }
+
+/* schedule (read) */
+.ev { display:flex; gap:12px; padding:8px 0; border-top:1px solid #f0ede6; }
+.ev:first-of-type { border-top:none; }
+.ev .time { flex:0 0 60px; font-variant-numeric:tabular-nums; font-weight:600; font-size:13px; color:#c0392b; }
+.ev .time.allday { color:#8a857c; font-weight:500; }
+.ev .summary { font-size:14px; }
+.ev .meta { font-size:12px; color:#8a857c; margin-top:2px; }
+.ev .meta a { color:#2d6cdf; text-decoration:none; }
+.day-title { font-size:13px; font-weight:700; margin:12px 0 6px; }
+.day-title:first-child { margin-top:0; }
+.muted { color:#a39d92; font-size:13px; font-style:italic; padding:6px 0; }
+.spinner { color:#a39d92; font-size:13px; }
+footer.note { text-align:center; color:#b0aa9e; font-size:12px; margin-top:22px; }
+.toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#1f1d1a; color:#fff; padding:10px 18px; border-radius:12px; font-size:14px; opacity:0; transition:.25s; pointer-events:none; z-index:50; }
+.toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="hello" id="hello">Привет 👋</div>
+    <div class="today-date" id="todayDate"></div>
+  </header>
+
+  <!-- AGENTS -->
+  <div class="card">
+    <h2>🤖 Агенты — накидать задачи</h2>
+    <div class="agents" id="agents"></div>
+    <div class="agent-hint">Агент смотрит на твои текущие задачи в своём домене и предлагает 3 следующих шага. Можешь оставить нужные, остальные удалить.</div>
+  </div>
+
+  <!-- TASK INBOX -->
+  <div class="card">
+    <h2>✅ Очередь задач <span class="count" id="taskCount"></span></h2>
+    <div class="addrow">
+      <input id="newTask" placeholder="Своя задача… (Enter)">
+      <button onclick="addManual()">Добавить</button>
+    </div>
+    <div class="filters" id="filters"></div>
+    <ul class="tasks" id="tasks"></ul>
+  </div>
+
+  <!-- SCHEDULE (read) -->
+  <div class="card">
+    <h2>📅 Что уже в календаре <span class="count">ближайшие дни</span></h2>
+    <div id="schedule"><div class="spinner">Загружаю события…</div></div>
+  </div>
+
+  <footer class="note">Задачи и агенты сохраняются в этом браузере. Кнопка «в календарь» создаёт реальное событие в Google Calendar.</footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CAL = "mcp__92f70542-72b3-4446-a904-2368c1f1153d";
+const TOOL_LIST = CAL+"__list_events";
+const TOOL_CREATE = CAL+"__create_event";
+const TZ = "Europe/Moscow";
+const LS = "desk_v2";
+
+/* domains */
+const DOMAINS = {
+  job:     {label:"Поиск работы", emoji:"🔍", color:"7",  chip:"#eef4ff", chipText:"#2d6cdf"},
+  fitness: {label:"Фитнес и тело", emoji:"💪", color:"10", chip:"#e8f6ec", chipText:"#2f8f46"},
+  home:    {label:"Быт",          emoji:"🏠", color:"5",  chip:"#fff4e0", chipText:"#b8860b"},
+  study:   {label:"Проекты/учёба", emoji:"📚", color:"3",  chip:"#f1edf9", chipText:"#7b53c9"},
+  general: {label:"Разное",       emoji:"•",  color:"8",  chip:"#eee",    chipText:"#6f6a61"}
+};
+const AGENTS = [
+  {domain:"job",     prompt:"Ты агент по поиску работы для человека, который ищет работу в сфере продакт-менеджмента и аналитики данных. На основе уже существующих задач предложи РОВНО 3 новых, конкретных, разных следующих шага на ближайшие 1-2 дня (например: обновить раздел резюме, откликнуться на конкретный тип вакансий, написать бывшему коллеге, подготовить ответ на типовой вопрос интервью). Коротко, по делу."},
+  {domain:"fitness", prompt:"Ты фитнес-агент. Предложи РОВНО 3 конкретные разные задачи на ближайшие дни: одна тренировка в зале, одна про растяжку/мобильность, одна про восстановление или режим. Учитывай уже имеющиеся задачи, не повторяйся."},
+  {domain:"home",    prompt:"Ты агент по быту. Предложи РОВНО 3 небольшие конкретные задачи по дому на ближайшие дни: что-то про готовку/еду, что-то про уборку, что-то про бытовую рутину. Коротко."},
+  {domain:"study",   prompt:"Ты агент по проектам и учёбе. Предложи РОВНО 3 конкретных следующих шага по текущим проектам или обучению (например, доделать модуль курса, собрать прототип, разобрать конспект). Коротко."}
+];
+
+/* state */
+let state = load();
+function load(){ try { return Object.assign({tasks:[],filter:"all"}, JSON.parse(localStorage.getItem(LS)||"{}")); } catch(e){ return {tasks:[],filter:"all"}; } }
+function save(){ localStorage.setItem(LS, JSON.stringify(state)); }
+
+/* header */
+const now = new Date();
+document.getElementById("todayDate").textContent =
+  now.toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+const hr = now.getHours();
+document.getElementById("hello").textContent =
+  (hr<6?"Доброй ночи":hr<12?"Доброе утро":hr<18?"Добрый день":"Добрый вечер")+", Наталья 👋";
+
+/* toast */
+let toastT;
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2600); }
+
+/* ---- agents ---- */
+function renderAgents(){
+  document.getElementById("agents").innerHTML = AGENTS.map((a,i)=>{
+    const d=DOMAINS[a.domain];
+    return '<button class="agent-btn" id="ag'+i+'" onclick="runAgent('+i+')"><span class="em">'+d.emoji+'</span>'+d.label+'</button>';
+  }).join("");
+}
+async function runAgent(i){
+  const a=AGENTS[i], d=DOMAINS[a.domain], btn=document.getElementById("ag"+i);
+  btn.disabled=true; const orig=btn.innerHTML; btn.innerHTML='<span class="em">⏳</span>думаю…';
+  const existing = state.tasks.filter(t=>t.domain===a.domain).map(t=>t.title);
+  const prompt = a.prompt +
+    "\n\nТекущие задачи в этом домене: " + (existing.length?existing.join("; "):"пока нет") +
+    "\n\nВерни ТОЛЬКО JSON-массив из 3 строк на русском, без пояснений. Каждая строка — одна задача, до 9 слов. Пример: [\"...\",\"...\",\"...\"]";
+  try {
+    const raw = await window.cowork.askClaude(prompt, []);
+    const items = parseList(raw);
+    if(!items.length){ toast("Агент не вернул задач, попробуй ещё раз"); }
+    else {
+      items.slice(0,3).forEach(title=>state.tasks.unshift(mkTask(title, d.label+" · агент", a.domain, true)));
+      save(); renderTasks(); toast(d.emoji+" Добавлено задач: "+Math.min(3,items.length));
+    }
+  } catch(e){ toast("Ошибка агента: "+(e&&e.message?e.message:e)); }
+  btn.disabled=false; btn.innerHTML=orig;
+}
+function parseList(raw){
+  let text = typeof raw==="string" ? raw : (raw && raw.content && raw.content[0] && raw.content[0].text) ? raw.content[0].text : (raw && raw.text) ? raw.text : JSON.stringify(raw);
+  const m = text.match(/\[[\s\S]*\]/);
+  if(m){ try { const arr=JSON.parse(m[0]); if(Array.isArray(arr)) return arr.map(String).map(s=>s.trim()).filter(Boolean); } catch(e){} }
+  // fallback: split lines / bullets
+  return text.split(/\n+/).map(s=>s.replace(/^[\s\-\d\.\)•]+/,"").trim()).filter(s=>s.length>2).slice(0,3);
+}
+
+/* ---- tasks ---- */
+let idc = Date.now();
+function mkTask(title, source, domain, fromAgent){ return {id:idc++, title, source, domain, fromAgent:!!fromAgent, done:false, when:null, schedOpen:false}; }
+function addManual(){
+  const el=document.getElementById("newTask"); const v=el.value.trim(); if(!v) return;
+  state.tasks.unshift(mkTask(v, "Я", guessDomain(v), false)); el.value=""; save(); renderTasks();
+}
+function guessDomain(t){
+  const s=t.toLowerCase();
+  if(/резюме|вакан|оффер|собес|интервью|отклик|работ|hr|linkedin/.test(s)) return "job";
+  if(/зал|трен|присед|растяж|бег|йог|спорт|мышц|кардио/.test(s)) return "fitness";
+  if(/убор|готов|еда|посуд|стир|продукт|кухн|быт/.test(s)) return "home";
+  if(/проект|курс|учёб|учеб|модул|прототип|конспект/.test(s)) return "study";
+  return "general";
+}
+function renderFilters(){
+  const counts={all:state.tasks.length};
+  Object.keys(DOMAINS).forEach(k=>counts[k]=state.tasks.filter(t=>t.domain===k).length);
+  let html='<span class="chip '+(state.filter==="all"?"active":"")+'" onclick="setFilter(\'all\')">Все · '+counts.all+'</span>';
+  Object.keys(DOMAINS).forEach(k=>{ if(counts[k]) html+='<span class="chip '+(state.filter===k?"active":"")+'" onclick="setFilter(\''+k+'\')">'+DOMAINS[k].emoji+' '+DOMAINS[k].label+' · '+counts[k]+'</span>'; });
+  document.getElementById("filters").innerHTML=html;
+}
+function setFilter(f){ state.filter=f; save(); renderTasks(); }
+function renderTasks(){
+  renderFilters();
+  const ul=document.getElementById("tasks");
+  let list = state.tasks.slice();
+  if(state.filter!=="all") list=list.filter(t=>t.domain===state.filter);
+  list.sort((a,b)=>(a.done-b.done));
+  document.getElementById("taskCount").textContent = state.tasks.filter(t=>!t.done).length+" активных";
+  if(!list.length){ ul.innerHTML='<li class="muted">Пусто. Добавь задачу сам или нажми агента сверху.</li>'; return; }
+  ul.innerHTML = list.map(t=>{
+    const d=DOMAINS[t.domain]||DOMAINS.general;
+    const dchip='<span class="dchip" style="background:'+d.chip+';color:'+d.chipText+'">'+d.emoji+' '+d.label+'</span>';
+    const src='<span class="src '+(t.fromAgent?"agent":"")+'">'+(t.fromAgent?"🤖 ":"")+esc(t.source)+'</span>';
+    const schedNote = t.when ? '<span class="scheduled-note">📅 '+fmtWhen(t.when)+'</span>' : '';
+    const schedBtn = t.when ? '' : '<button class="iconbtn sched" onclick="toggleSched('+t.id+')">📅 в календарь</button>';
+    const form = t.schedOpen ? schedForm(t) : '';
+    return '<li class="task"><div class="main">'+
+      '<span class="chk'+(t.done?" on":"")+'" onclick="toggleDone('+t.id+')">'+(t.done?"✓":"")+'</span>'+
+      '<div class="body"><div class="title'+(t.done?" done":"")+'">'+esc(t.title)+'</div>'+
+      '<div class="tags">'+dchip+src+schedNote+'</div>'+form+'</div>'+
+      '<div class="acts">'+schedBtn+'<span class="del" onclick="delTask('+t.id+')">×</span></div>'+
+      '</div></li>';
+  }).join("");
+}
+function schedForm(t){
+  const def=defaultWhen();
+  return '<div class="sched-form">'+
+    '<span class="lbl">Дата</span><input type="date" id="sd'+t.id+'" value="'+def.date+'">'+
+    '<span class="lbl">Время</span><input type="time" id="st'+t.id+'" value="'+def.time+'">'+
+    '<button class="btn" onclick="schedule('+t.id+')">Создать событие</button>'+
+    '<button class="iconbtn" onclick="toggleSched('+t.id+')">отмена</button></div>';
+}
+function defaultWhen(){ const d=new Date(); d.setDate(d.getDate()+1); return {date:d.toISOString().slice(0,10), time:"10:00"}; }
+function toggleDone(id){ const t=find(id); if(t){t.done=!t.done; save(); renderTasks();} }
+function delTask(id){ state.tasks=state.tasks.filter(t=>t.id!==id); save(); renderTasks(); }
+function toggleSched(id){ const t=find(id); if(t){ t.schedOpen=!t.schedOpen; save(); renderTasks(); } }
+function find(id){ return state.tasks.find(t=>t.id===id); }
+
+async function schedule(id){
+  const t=find(id); if(!t) return;
+  const date=document.getElementById("sd"+id).value, time=document.getElementById("st"+id).value;
+  if(!date||!time){ toast("Укажи дату и время"); return; }
+  const dt=new Date(date+"T"+time+":00Z");
+  const start=dt.toISOString().slice(0,19);
+  const end=new Date(dt.getTime()+60*60000).toISOString().slice(0,19);
+  const d=DOMAINS[t.domain]||DOMAINS.general;
+  toast("Создаю событие…");
+  try {
+    const r=await window.cowork.callMcpTool(TOOL_CREATE,{ summary:t.title, startTime:start, endTime:end, timeZone:TZ, colorId:d.color, description:"Создано с рабочего стола ("+t.source+")" });
+    const data=r.structuredContent ?? (r.content&&r.content[0]?JSON.parse(r.content[0].text):{});
+    if(r.isError){ throw new Error((data&&data.error)||"calendar error"); }
+    t.when=start; t.schedOpen=false; save(); renderTasks(); loadSchedule(); toast("✅ В календаре: "+fmtWhen(start));
+  } catch(e){ toast("Не удалось создать событие: "+(e&&e.message?e.message:e)); }
+}
+function fmtWhen(iso){ const d=new Date(iso+"Z"); return d.toLocaleString("ru-RU",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:TZ}); }
+
+/* ---- schedule read ---- */
+async function loadSchedule(){
+  const el=document.getElementById("schedule");
+  const start=new Date(); start.setHours(0,0,0,0);
+  const end=new Date(start); end.setDate(end.getDate()+7);
+  try {
+    const r=await window.cowork.callMcpTool(TOOL_LIST,{ startTime:start.toISOString(), endTime:end.toISOString(), orderBy:"startTime", pageSize:50 });
+    const data=r.structuredContent ?? JSON.parse(r.content[0].text);
+    renderSchedule((data&&data.events)||[]);
+  } catch(e){ el.innerHTML='<div class="muted">Не удалось загрузить календарь.</div>'; }
+}
+function evStart(ev){
+  if(ev.start&&ev.start.dateTime) return {date:new Date(ev.start.dateTime),allDay:false};
+  if(ev.start&&ev.start.date) return {date:new Date(ev.start.date+"T00:00:00"),allDay:true};
+  return {date:null,allDay:false};
+}
+function renderSchedule(events){
+  const el=document.getElementById("schedule");
+  if(!events.length){ el.innerHTML='<div class="muted">На ближайшую неделю событий нет.</div>'; return; }
+  const byDay={};
+  events.forEach(ev=>{ const s=evStart(ev); if(!s.date) return; const k=s.date.toISOString().slice(0,10); (byDay[k]=byDay[k]||[]).push({ev,s}); });
+  const todayKey=new Date().toISOString().slice(0,10);
+  let html="";
+  Object.keys(byDay).sort().forEach(k=>{
+    const d=new Date(k+"T00:00:00");
+    const label=(k===todayKey?"Сегодня · ":"")+d.toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"});
+    html+='<div class="day-title">'+label+'</div>';
+    byDay[k].sort((a,b)=>a.s.date-b.s.date).forEach(({ev,s})=>{
+      const time=s.allDay?"весь день":s.date.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});
+      const loc=ev.location?esc(ev.location.split(",")[0]):"";
+      const meet=ev.conferenceUrl?'<a href="'+ev.conferenceUrl+'" target="_blank">видео ↗</a>':"";
+      const meta=[loc,meet].filter(Boolean).join(" · ");
+      html+='<div class="ev"><div class="time'+(s.allDay?" allday":"")+'">'+time+'</div><div><div class="summary">'+esc(ev.summary||"(без названия)")+'</div>'+(meta?'<div class="meta">'+meta+'</div>':'')+'</div></div>';
+    });
+  });
+  el.innerHTML=html;
+}
+
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+document.getElementById("newTask").addEventListener("keydown",e=>{ if(e.key==="Enter") addManual(); });
+
+renderAgents(); renderTasks(); loadSchedule();
+</script>
+</body>
+</html>
