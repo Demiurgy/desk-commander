@@ -241,6 +241,25 @@ async function simCall(action, body){
   return (data && data.output!==undefined) ? data.output : data;   // n8n may wrap result in {output:...}
 }
 
+/* ---- demo mode: no backend AND not in Cowork (e.g. GitHub Pages) -> sample data ---- */
+function demoMode(){ return !simUrl("listEvents") && !simUrl("agent") && !inCowork(); }
+function demoEvents(){
+  const mk=(addDays,h,m,summary)=>{ const d=new Date(); d.setDate(d.getDate()+addDays); d.setHours(h,m,0,0);
+    const e=new Date(d.getTime()+3600000); return {summary, start:{dateTime:d.toISOString()}, end:{dateTime:e.toISOString()}}; };
+  return [ mk(0,18,0,"Meetup"), mk(1,12,0,"Interview — Acme"), mk(1,19,30,"Gym — back day"),
+           mk(2,10,0,"Course: Intro to ABM"), mk(3,15,0,"Take the cat to the vet") ];
+}
+function demoTasks(domain){
+  const D={
+    job:["Update resume with recent wins","Apply to 3 product roles today","Message a former colleague for a referral"],
+    fitness:["30-min gym session: legs","10-min mobility before bed","Schedule a rest day Thursday"],
+    home:["Cook a batch meal for two days","Quick 15-min kitchen tidy-up","Take out the recycling"],
+    study:["Finish module 3 of the course","Prototype one small feature","Review yesterday's notes"],
+    general:["Plan the week ahead","20 min of inbox cleanup","Pick one thing to finish today"]
+  };
+  return D[domain]||D.general;
+}
+
 async function apiListEvents(startISO, endISO){
   if(simUrl("listEvents")){
     const data=await simCall("listEvents",{startTime:startISO,endTime:endISO});
@@ -251,7 +270,7 @@ async function apiListEvents(startISO, endISO){
     const data=r.structuredContent ?? JSON.parse(r.content[0].text);
     return (data&&data.events)||[];
   }
-  throw new Error("no backend (open in Cowork or set the n8n URL)");
+  return demoEvents();   // no backend configured -> sample data (e.g. GitHub Pages)
 }
 async function apiCreateEvent(payload){
   if(simUrl("createEvent")){ return await simCall("createEvent", payload); }
@@ -261,7 +280,7 @@ async function apiCreateEvent(payload){
     if(r.isError) throw new Error((data&&data.error)||"calendar error");
     return data;
   }
-  throw new Error("no backend");
+  return {ok:true, demo:true};   // demo mode: pretend success
 }
 async function apiAgent(domain, existing, prompt){
   if(simUrl("agent")){
@@ -274,7 +293,7 @@ async function apiAgent(domain, existing, prompt){
   if(inCowork()){
     return parseList(await window.cowork.askClaude(prompt, []));
   }
-  throw new Error("no backend");
+  return demoTasks(domain);   // demo mode: canned suggestions
 }
 
 /* domains */
@@ -468,6 +487,7 @@ function renderSchedule(events){
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 document.getElementById("newTask").addEventListener("keydown",e=>{ if(e.key==="Enter") addManual(); });
 
+if(demoMode()){ document.querySelector("footer.note").textContent = "Demo mode — sample data. Agents & calendar are mocked; connect an n8n backend (see README) for the live version."; }
 renderAgents(); renderTasks(); loadSchedule();
 </script>
 </body>
