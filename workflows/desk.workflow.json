@@ -1,0 +1,163 @@
+{
+  "name": "desk",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "323251a4-41b3-42b8-8603-afc0cf225ad4",
+        "responseMode": "responseNode",
+        "options": { "allowedOrigins": "*" }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-480, -128],
+      "id": "78cc5a01-f990-447a-b304-756545645c80",
+      "name": "Webhook",
+      "webhookId": "323251a4-41b3-42b8-8603-afc0cf225ad4"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+                "conditions": [
+                  { "leftValue": "={{ $json.body.action }}", "rightValue": "listEvents", "operator": { "type": "string", "operation": "equals" }, "id": "46d476fb-aec3-4dd2-a1f2-d8247c2a4722" }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+                "conditions": [
+                  { "id": "1329256f-30e6-4472-9dd3-92302dafe265", "leftValue": "={{ $json.body.action }}", "rightValue": "createEvent", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+                "conditions": [
+                  { "id": "45ff58f1-b228-47b0-b8ff-f157ce83a0b1", "leftValue": "={{ $json.body.action }}", "rightValue": "agent", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [-192, -144],
+      "id": "51b31c9a-99c8-47ac-8b70-9904c4f4de4a",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": { "__rl": true, "value": "primary", "mode": "id" },
+        "timeMin": "={{ $json.body.startTime }}",
+        "timeMax": "={{ $json.body.endTime }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [48, -304],
+      "id": "484f7eea-f6d0-43a5-9877-4e371732714a",
+      "name": "Get many events"
+    },
+    {
+      "parameters": { "respondWith": "allIncomingItems", "options": {} },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [384, -304],
+      "id": "28fd1897-4e92-4393-bffb-11996bbbd6be",
+      "name": "respond get events"
+    },
+    {
+      "parameters": {
+        "calendar": { "__rl": true, "value": "primary", "mode": "id" },
+        "start": "={{ $json.body.startTime }}",
+        "end": "={{ $json.body.endTime }}",
+        "additionalFields": {
+          "description": "={{ $json.body.description }}",
+          "summary": "={{ $json.body.summary }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [16, -128],
+      "id": "c00177fd-a53a-4231-b5a1-cc0a3f874a15",
+      "name": "Create an event"
+    },
+    {
+      "parameters": { "respondWith": "json", "responseBody": "{ \"ok\": true }", "options": {} },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [384, -128],
+      "id": "dfde41be-4101-4fef-92c4-515981da697f",
+      "name": "Respond create event"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=domain: {{ $json.body.domain }}; existing: {{ $json.body.existing }}",
+        "messages": {
+          "messageValues": [
+            { "message": "You are a domain planner. Based on the domain and the existing tasks, suggest EXACTLY 3 short, distinct, concrete tasks (up to 9 words each) in English. Return ONLY a JSON array of 3 strings, no explanation." }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [16, 144],
+      "id": "34235cba-80f8-42b0-b8fe-40e88e52fff7",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": { "__rl": true, "value": "claude-haiku-4-5-20251001", "mode": "list", "cachedResultName": "Claude Haiku 4.5" },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [16, 336],
+      "id": "b88e4378-ebb7-45ac-8071-0dbe17a9dab7",
+      "name": "Anthropic Chat Model"
+    },
+    {
+      "parameters": { "respondWith": "json", "responseBody": "={{ { \"tasks\": $json.text } }}", "options": {} },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [384, 144],
+      "id": "081d57b6-e708-4e66-9dc6-dbd9d89dc3ad",
+      "name": "Respond Agent"
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Switch", "type": "main", "index": 0 }]] },
+    "Switch": {
+      "main": [
+        [{ "node": "Get many events", "type": "main", "index": 0 }],
+        [{ "node": "Create an event", "type": "main", "index": 0 }],
+        [{ "node": "Basic LLM Chain", "type": "main", "index": 0 }]
+      ]
+    },
+    "Anthropic Chat Model": { "ai_languageModel": [[{ "node": "Basic LLM Chain", "type": "ai_languageModel", "index": 0 }]] },
+    "Basic LLM Chain": { "main": [[{ "node": "Respond Agent", "type": "main", "index": 0 }]] },
+    "Get many events": { "main": [[{ "node": "respond get events", "type": "main", "index": 0 }]] },
+    "Create an event": { "main": [[{ "node": "Respond create event", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Belgrade"
+  },
+  "meta": {
+    "note": "Import into n8n, then attach your credentials: Google Calendar OAuth2 (Get many events / Create an event nodes) and Anthropic (Anthropic Chat Model). After import, make sure the Create an event node points to the right calendar, and set the workflow Timezone to your zone."
+  }
+}

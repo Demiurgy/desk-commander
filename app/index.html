@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Рабочий стол — движок задач</title>
+<title>Command Desk</title>
 <style>
 :root { color-scheme: light; }
 * { box-sizing: border-box; }
@@ -20,13 +20,13 @@ body {
 }
 .card h2 .count { margin-left:auto; font-weight:600; color:#b0aa9e; text-transform:none; letter-spacing:0; }
 
-/* ---- TOP GRID: schedule (left) + hero (right) ---- */
+/* ---- TOP GRID: hero (left) + schedule (right) ---- */
 .topgrid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:16px; align-items:stretch; margin-bottom:16px; }
 .schedule-card { margin-bottom:0; border-color:#c9d6f0; }
 .schedule-card h2 { justify-content:center; }
 .hero { margin-bottom:0; display:flex; flex-direction:column; justify-content:center; }
 .hello { font-size:46px; line-height:1.02; font-weight:800; letter-spacing:-0.03em; }
-.today-date { color:#8a857c; font-size:18px; margin-top:8px; text-transform:capitalize; }
+.today-date { color:#8a857c; font-size:18px; margin-top:8px; }
 .hero .addrow { margin-top:20px; margin-bottom:0; }
 
 /* add task */
@@ -94,7 +94,7 @@ body {
 /* schedule (read) */
 .ev { display:flex; gap:12px; padding:9px 0; border-top:1px solid #f0ede6; }
 .ev:first-of-type { border-top:none; }
-.ev .time { flex:0 0 56px; font-variant-numeric:tabular-nums; font-weight:700; font-size:15px; }
+.ev .time { flex:0 0 60px; font-variant-numeric:tabular-nums; font-weight:700; font-size:15px; }
 .ev .time.allday { color:#8a857c; font-weight:500; font-size:13px; }
 .ev .dot { flex:0 0 9px; width:9px; height:9px; border-radius:50%; margin-top:6px; }
 .ev .summary { font-size:15px; font-weight:500; }
@@ -117,57 +117,117 @@ footer.note { text-align:center; color:#b0aa9e; font-size:12px; margin-top:22px;
   <!-- TOP: hero greeting/input (left) + schedule (right) -->
   <div class="topgrid">
     <div class="hero card">
-      <div class="hello" id="hello">Привет.</div>
+      <div class="hello" id="hello">Hello.</div>
       <div class="today-date" id="todayDate"></div>
       <div class="addrow">
-        <input id="newTask" placeholder="Что нужно сделать?">
+        <input id="newTask" placeholder="What needs doing?">
         <button onclick="addManual()">+</button>
       </div>
     </div>
     <div class="card schedule-card">
-      <h2>Ближайшие события</h2>
-      <div id="schedule"><div class="spinner">Загружаю события…</div></div>
+      <h2>Upcoming</h2>
+      <div id="schedule"><div class="spinner">Loading events…</div></div>
     </div>
   </div>
 
   <!-- AGENTS -->
   <div class="card">
-    <h2>🤖 Агенты</h2>
+    <h2>🤖 Agents</h2>
     <div class="agents" id="agents"></div>
-    <div class="agent-hint">Агент смотрит на твои задачи в своём домене и предлагает 3 следующих шага.</div>
+    <div class="agent-hint">An agent looks at your tasks in its domain and suggests 3 next steps.</div>
   </div>
 
   <!-- TASK LIST -->
   <div class="card">
-    <h2>На сегодня <span class="count" id="taskCount"></span></h2>
+    <h2>Today <span class="count" id="taskCount"></span></h2>
     <div class="filters" id="filters"></div>
     <ul class="tasks" id="tasks"></ul>
   </div>
 
-  <footer class="note">Задачи и агенты сохраняются в этом браузере. «В календарь» создаёт реальное событие в Google Calendar.</footer>
+  <footer class="note">Tasks and agent output are saved in this browser. “To calendar” creates a real event in Google Calendar.</footer>
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="config.js"></script>
 <script>
 const CAL = "mcp__92f70542-72b3-4446-a904-2368c1f1153d";
 const TOOL_LIST = CAL+"__list_events";
 const TOOL_CREATE = CAL+"__create_event";
-const TZ = "Europe/Moscow";
+const TZ = "Europe/Belgrade";
 const LS = "desk_v2";
+
+/* ---- backend adapter: Cowork runtime OR n8n workflow ----
+   The n8n webhook URL is read from app/config.js (copy app/config.example.js → config.js
+   and set your URL). config.js is gitignored so the URL never lands in the repo.
+   If no config is present, BACKEND.url is empty and the desk falls back to the Cowork runtime. */
+const CFG = (typeof window!=="undefined" && window.DESK_CONFIG) ? window.DESK_CONFIG : {};
+const BACKEND = {
+  url:         CFG.url || "",            // one n8n workflow for everything; we send {action, ...}
+  listEvents:  CFG.listEvents || "",     // (optional) separate URLs if you build three workflows
+  createEvent: CFG.createEvent || "",
+  agent:       CFG.agent || "",
+  apiKey:      CFG.apiKey || ""          // n8n API key (only if the trigger has auth)
+};
+const inCowork = () => (typeof window!=="undefined" && window.cowork && window.cowork.callMcpTool);
+function simHeaders(){ const h={"Content-Type":"application/json"}; if(BACKEND.apiKey) h["x-api-key"]=BACKEND.apiKey; return h; }
+function simUrl(action){ return BACKEND.url || BACKEND[action]; }
+async function simCall(action, body){
+  const payload = BACKEND.url ? Object.assign({action}, body) : body;   // single URL -> include action
+  const res=await fetch(simUrl(action),{method:"POST",headers:simHeaders(),body:JSON.stringify(payload)});
+  if(!res.ok) throw new Error("n8n "+res.status);
+  const data = await res.json().catch(()=>({}));
+  return (data && data.output!==undefined) ? data.output : data;   // n8n may wrap result in {output:...}
+}
+
+async function apiListEvents(startISO, endISO){
+  if(simUrl("listEvents")){
+    const data=await simCall("listEvents",{startTime:startISO,endTime:endISO});
+    return Array.isArray(data)?data:(data.events||[]);
+  }
+  if(inCowork()){
+    const r=await window.cowork.callMcpTool(TOOL_LIST,{startTime:startISO,endTime:endISO,orderBy:"startTime",pageSize:50});
+    const data=r.structuredContent ?? JSON.parse(r.content[0].text);
+    return (data&&data.events)||[];
+  }
+  throw new Error("no backend (open in Cowork or set the n8n URL)");
+}
+async function apiCreateEvent(payload){
+  if(simUrl("createEvent")){ return await simCall("createEvent", payload); }
+  if(inCowork()){
+    const r=await window.cowork.callMcpTool(TOOL_CREATE,payload);
+    const data=r.structuredContent ?? (r.content&&r.content[0]?JSON.parse(r.content[0].text):{});
+    if(r.isError) throw new Error((data&&data.error)||"calendar error");
+    return data;
+  }
+  throw new Error("no backend");
+}
+async function apiAgent(domain, existing, prompt){
+  if(simUrl("agent")){
+    const data=await simCall("agent",{domain,existing});
+    let arr = Array.isArray(data) ? data : (data.tasks ?? data.items ?? data);
+    if(typeof arr === "string") arr = parseList(arr);                 // model often returns the array as a string / in ```json
+    if(!Array.isArray(arr)) arr = parseList(typeof data==="string"?data:JSON.stringify(data));
+    return arr.map(String).map(s=>s.trim()).filter(Boolean);
+  }
+  if(inCowork()){
+    return parseList(await window.cowork.askClaude(prompt, []));
+  }
+  throw new Error("no backend");
+}
 
 /* domains */
 const DOMAINS = {
-  job:     {label:"Поиск работы", emoji:"🔍", color:"7",  chip:"#eef4ff", chipText:"#2d6cdf", dot:"#2d6cdf"},
-  fitness: {label:"Фитнес и тело", emoji:"💪", color:"10", chip:"#e8f6ec", chipText:"#2f8f46", dot:"#2f8f46"},
-  home:    {label:"Быт",          emoji:"🏠", color:"5",  chip:"#fff4e0", chipText:"#b8860b", dot:"#e0a82e"},
-  study:   {label:"Проекты/учёба", emoji:"📚", color:"3",  chip:"#f1edf9", chipText:"#7b53c9", dot:"#7b53c9"},
-  general: {label:"Разное",       emoji:"•",  color:"8",  chip:"#eee",    chipText:"#6f6a61", dot:"#b0aa9e"}
+  job:     {label:"Job search",   emoji:"🔍", color:"7",  chip:"#eef4ff", chipText:"#2d6cdf", dot:"#2d6cdf"},
+  fitness: {label:"Fitness & body",emoji:"💪", color:"10", chip:"#e8f6ec", chipText:"#2f8f46", dot:"#2f8f46"},
+  home:    {label:"Home",         emoji:"🏠", color:"5",  chip:"#fff4e0", chipText:"#b8860b", dot:"#e0a82e"},
+  study:   {label:"Projects & learning", emoji:"📚", color:"3",  chip:"#f1edf9", chipText:"#7b53c9", dot:"#7b53c9"},
+  general: {label:"Other",        emoji:"•",  color:"8",  chip:"#eee",    chipText:"#6f6a61", dot:"#b0aa9e"}
 };
 const AGENTS = [
-  {domain:"job",     prompt:"Ты агент по поиску работы для человека, который ищет работу в сфере продакт-менеджмента и аналитики данных. На основе уже существующих задач предложи РОВНО 3 новых, конкретных, разных следующих шага на ближайшие 1-2 дня (например: обновить раздел резюме, откликнуться на конкретный тип вакансий, написать бывшему коллеге, подготовить ответ на типовой вопрос интервью). Коротко, по делу."},
-  {domain:"fitness", prompt:"Ты фитнес-агент. Предложи РОВНО 3 конкретные разные задачи на ближайшие дни: одна тренировка в зале, одна про растяжку/мобильность, одна про восстановление или режим. Учитывай уже имеющиеся задачи, не повторяйся."},
-  {domain:"home",    prompt:"Ты агент по быту. Предложи РОВНО 3 небольшие конкретные задачи по дому на ближайшие дни: что-то про готовку/еду, что-то про уборку, что-то про бытовую рутину. Коротко."},
-  {domain:"study",   prompt:"Ты агент по проектам и учёбе. Предложи РОВНО 3 конкретных следующих шага по текущим проектам или обучению (например, доделать модуль курса, собрать прототип, разобрать конспект). Коротко."}
+  {domain:"job",     prompt:"You are a job-search agent for someone looking for work in product management and data analytics. Based on the existing tasks, suggest EXACTLY 3 new, concrete, distinct next steps for the next 1-2 days (e.g. update a resume section, apply to a specific kind of role, message a former colleague, prep an answer to a common interview question). Short and actionable."},
+  {domain:"fitness", prompt:"You are a fitness agent. Suggest EXACTLY 3 concrete, distinct tasks for the next few days: one gym workout, one mobility/stretching item, one about recovery or routine. Consider the existing tasks, don't repeat."},
+  {domain:"home",    prompt:"You are a home/chores agent. Suggest EXACTLY 3 small concrete home tasks for the next few days: one about cooking/food, one about cleaning, one about a household routine. Keep it short."},
+  {domain:"study",   prompt:"You are a projects & learning agent. Suggest EXACTLY 3 concrete next steps for current projects or studies (e.g. finish a course module, build a prototype, review notes). Keep it short."}
 ];
 
 /* state */
@@ -178,10 +238,10 @@ function save(){ localStorage.setItem(LS, JSON.stringify(state)); }
 /* header */
 const now = new Date();
 document.getElementById("todayDate").textContent =
-  now.toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  now.toLocaleDateString("en-US",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 const hr = now.getHours();
 document.getElementById("hello").textContent =
-  (hr<6?"Доброй ночи":hr<12?"Доброе утро":hr<18?"Добрый день":"Добрый вечер")+".";
+  (hr<6?"Good night":hr<12?"Good morning":hr<18?"Good afternoon":"Good evening")+".";
 
 /* toast */
 let toastT;
@@ -196,20 +256,19 @@ function renderAgents(){
 }
 async function runAgent(i){
   const a=AGENTS[i], d=DOMAINS[a.domain], btn=document.getElementById("ag"+i);
-  btn.disabled=true; const orig=btn.innerHTML; btn.innerHTML='<span class="em">⏳</span>думаю…';
+  btn.disabled=true; const orig=btn.innerHTML; btn.innerHTML='<span class="em">⏳</span>thinking…';
   const existing = state.tasks.filter(t=>t.domain===a.domain).map(t=>t.title);
   const prompt = a.prompt +
-    "\n\nТекущие задачи в этом домене: " + (existing.length?existing.join("; "):"пока нет") +
-    "\n\nВерни ТОЛЬКО JSON-массив из 3 строк на русском, без пояснений. Каждая строка — одна задача, до 9 слов. Пример: [\"...\",\"...\",\"...\"]";
+    "\n\nCurrent tasks in this domain: " + (existing.length?existing.join("; "):"none yet") +
+    "\n\nReturn ONLY a JSON array of 3 strings in English, no explanation. Each string is one task, up to 9 words. Example: [\"...\",\"...\",\"...\"]";
   try {
-    const raw = await window.cowork.askClaude(prompt, []);
-    const items = parseList(raw);
-    if(!items.length){ toast("Агент не вернул задач, попробуй ещё раз"); }
+    const items = await apiAgent(a.domain, existing, prompt);
+    if(!items.length){ toast("Agent returned nothing, try again"); }
     else {
-      items.slice(0,3).forEach(title=>state.tasks.unshift(mkTask(title, d.label+" · агент", a.domain, true)));
-      save(); renderTasks(); toast(d.emoji+" Добавлено задач: "+Math.min(3,items.length));
+      items.slice(0,3).forEach(title=>state.tasks.unshift(mkTask(title, d.label+" · agent", a.domain, true)));
+      save(); renderTasks(); toast(d.emoji+" Added "+Math.min(3,items.length)+" tasks");
     }
-  } catch(e){ toast("Ошибка агента: "+(e&&e.message?e.message:e)); }
+  } catch(e){ toast("Agent error: "+(e&&e.message?e.message:e)); }
   btn.disabled=false; btn.innerHTML=orig;
 }
 function parseList(raw){
@@ -224,20 +283,20 @@ let idc = Date.now();
 function mkTask(title, source, domain, fromAgent){ return {id:idc++, title, source, domain, fromAgent:!!fromAgent, done:false, when:null, schedOpen:false}; }
 function addManual(){
   const el=document.getElementById("newTask"); const v=el.value.trim(); if(!v) return;
-  state.tasks.unshift(mkTask(v, "Я", guessDomain(v), false)); el.value=""; save(); renderTasks();
+  state.tasks.unshift(mkTask(v, "Me", guessDomain(v), false)); el.value=""; save(); renderTasks();
 }
 function guessDomain(t){
   const s=t.toLowerCase();
-  if(/резюме|вакан|оффер|собес|интервью|отклик|работ|hr|linkedin/.test(s)) return "job";
-  if(/зал|трен|присед|растяж|бег|йог|спорт|мышц|кардио/.test(s)) return "fitness";
-  if(/убор|готов|еда|посуд|стир|продукт|кухн|быт/.test(s)) return "home";
-  if(/проект|курс|учёб|учеб|модул|прототип|конспект|глав|алгоритм/.test(s)) return "study";
+  if(/resume|cv|vacanc|offer|interview|appl(y|ication)|recruit|hr|linkedin|job/.test(s)) return "job";
+  if(/gym|workout|train|squat|stretch|run|yoga|sport|muscle|cardio|mobility/.test(s)) return "fitness";
+  if(/clean|cook|food|dishes|laundry|grocer|kitchen|chore|tidy/.test(s)) return "home";
+  if(/project|course|study|learn|module|prototype|notes|chapter|algorithm/.test(s)) return "study";
   return "general";
 }
 function renderFilters(){
   const counts={all:state.tasks.length};
   Object.keys(DOMAINS).forEach(k=>counts[k]=state.tasks.filter(t=>t.domain===k).length);
-  let html='<span class="chip '+(state.filter==="all"?"active":"")+'" onclick="setFilter(\'all\')">Все · '+counts.all+'</span>';
+  let html='<span class="chip '+(state.filter==="all"?"active":"")+'" onclick="setFilter(\'all\')">All · '+counts.all+'</span>';
   Object.keys(DOMAINS).forEach(k=>{ if(counts[k]) html+='<span class="chip '+(state.filter===k?"active":"")+'" onclick="setFilter(\''+k+'\')">'+DOMAINS[k].emoji+' '+DOMAINS[k].label+' · '+counts[k]+'</span>'; });
   document.getElementById("filters").innerHTML=html;
 }
@@ -248,14 +307,14 @@ function renderTasks(){
   let list = state.tasks.slice();
   if(state.filter!=="all") list=list.filter(t=>t.domain===state.filter);
   list.sort((a,b)=>(a.done-b.done));
-  document.getElementById("taskCount").textContent = state.tasks.filter(t=>!t.done).length+" активных";
-  if(!list.length){ ul.innerHTML='<li class="muted">Пусто. Добавь задачу сам или нажми агента сверху.</li>'; return; }
+  document.getElementById("taskCount").textContent = state.tasks.filter(t=>!t.done).length+" active";
+  if(!list.length){ ul.innerHTML='<li class="muted">Empty. Add a task yourself or tap an agent above.</li>'; return; }
   ul.innerHTML = list.map(t=>{
     const d=DOMAINS[t.domain]||DOMAINS.general;
     const dchip='<span class="dchip" style="background:'+d.chip+';color:'+d.chipText+'">'+d.emoji+' '+d.label+'</span>';
     const src='<span class="src '+(t.fromAgent?"agent":"")+'">'+(t.fromAgent?"🤖 ":"")+esc(t.source)+'</span>';
     const schedNote = t.when ? '<span class="scheduled-note">📅 '+fmtWhen(t.when)+'</span>' : '';
-    const schedBtn = t.when ? '' : '<button class="iconbtn sched" onclick="toggleSched('+t.id+')">📅 в календарь</button>';
+    const schedBtn = t.when ? '' : '<button class="iconbtn sched" onclick="toggleSched('+t.id+')">📅 to calendar</button>';
     const form = t.schedOpen ? schedForm(t) : '';
     return '<li class="task"><div class="main">'+
       '<span class="chk'+(t.done?" on":"")+'" onclick="toggleDone('+t.id+')">'+(t.done?"✓":"")+'</span>'+
@@ -268,10 +327,10 @@ function renderTasks(){
 function schedForm(t){
   const def=defaultWhen();
   return '<div class="sched-form">'+
-    '<span class="lbl">Дата</span><input type="date" id="sd'+t.id+'" value="'+def.date+'">'+
-    '<span class="lbl">Время</span><input type="time" id="st'+t.id+'" value="'+def.time+'">'+
-    '<button class="btn" onclick="schedule('+t.id+')">Создать событие</button>'+
-    '<button class="iconbtn" onclick="toggleSched('+t.id+')">отмена</button></div>';
+    '<span class="lbl">Date</span><input type="date" id="sd'+t.id+'" value="'+def.date+'">'+
+    '<span class="lbl">Time</span><input type="time" id="st'+t.id+'" value="'+def.time+'">'+
+    '<button class="btn" onclick="schedule('+t.id+')">Create event</button>'+
+    '<button class="iconbtn" onclick="toggleSched('+t.id+')">cancel</button></div>';
 }
 function defaultWhen(){ const d=new Date(); d.setDate(d.getDate()+1); return {date:d.toISOString().slice(0,10), time:"10:00"}; }
 function toggleDone(id){ const t=find(id); if(t){t.done=!t.done; save(); renderTasks();} }
@@ -282,20 +341,18 @@ function find(id){ return state.tasks.find(t=>t.id===id); }
 async function schedule(id){
   const t=find(id); if(!t) return;
   const date=document.getElementById("sd"+id).value, time=document.getElementById("st"+id).value;
-  if(!date||!time){ toast("Укажи дату и время"); return; }
+  if(!date||!time){ toast("Pick a date and time"); return; }
   const dt=new Date(date+"T"+time+":00Z");
   const start=dt.toISOString().slice(0,19);
   const end=new Date(dt.getTime()+60*60000).toISOString().slice(0,19);
   const d=DOMAINS[t.domain]||DOMAINS.general;
-  toast("Создаю событие…");
+  toast("Creating event…");
   try {
-    const r=await window.cowork.callMcpTool(TOOL_CREATE,{ summary:t.title, startTime:start, endTime:end, timeZone:TZ, colorId:d.color, description:"Создано с рабочего стола ("+t.source+")" });
-    const data=r.structuredContent ?? (r.content&&r.content[0]?JSON.parse(r.content[0].text):{});
-    if(r.isError){ throw new Error((data&&data.error)||"calendar error"); }
-    t.when=start; t.schedOpen=false; save(); renderTasks(); loadSchedule(); toast("✅ В календаре: "+fmtWhen(start));
-  } catch(e){ toast("Не удалось создать событие: "+(e&&e.message?e.message:e)); }
+    await apiCreateEvent({ summary:t.title, startTime:start, endTime:end, timeZone:TZ, colorId:d.color, description:"Created from Command Desk ("+t.source+")" });
+    t.when=start; t.schedOpen=false; save(); renderTasks(); loadSchedule(); toast("✅ On calendar: "+fmtWhen(start));
+  } catch(e){ toast("Couldn't create event: "+(e&&e.message?e.message:e)); }
 }
-function fmtWhen(iso){ const d=new Date(iso+"Z"); return d.toLocaleString("ru-RU",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:TZ}); }
+function fmtWhen(iso){ const d=new Date(iso+"Z"); return d.toLocaleString("en-US",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:TZ}); }
 
 /* ---- schedule read ---- */
 async function loadSchedule(){
@@ -303,10 +360,9 @@ async function loadSchedule(){
   const start=new Date(); start.setHours(0,0,0,0);
   const end=new Date(start); end.setDate(end.getDate()+7);
   try {
-    const r=await window.cowork.callMcpTool(TOOL_LIST,{ startTime:start.toISOString(), endTime:end.toISOString(), orderBy:"startTime", pageSize:50 });
-    const data=r.structuredContent ?? JSON.parse(r.content[0].text);
-    renderSchedule((data&&data.events)||[]);
-  } catch(e){ el.innerHTML='<div class="muted">Не удалось загрузить календарь.</div>'; }
+    const events = await apiListEvents(start.toISOString(), end.toISOString());
+    renderSchedule(events);
+  } catch(e){ el.innerHTML='<div class="muted">Couldn\'t load the calendar.</div>'; }
 }
 function evStart(ev){
   if(ev.start&&ev.start.dateTime) return {date:new Date(ev.start.dateTime),allDay:false};
@@ -315,14 +371,14 @@ function evStart(ev){
 }
 function guessEventDomain(ev){
   const s=((ev.summary||"")+" "+(ev.location||"")).toLowerCase();
-  if(/зал|трен|присед|растяж|бег|йог|спорт|мышц|кардио|спина|ноги/.test(s)) return "fitness";
-  if(/интервью|собес|вакан|hr|оффер/.test(s)) return "job";
-  if(/курс|урок|занят|лекц|модул|интенсив/.test(s)) return "study";
+  if(/gym|workout|train|squat|stretch|run|yoga|sport|muscle|cardio|back|legs/.test(s)) return "fitness";
+  if(/interview|recruit|vacanc|hr|offer/.test(s)) return "job";
+  if(/course|lesson|class|lecture|module|study/.test(s)) return "study";
   return "general";
 }
 function renderSchedule(events){
   const el=document.getElementById("schedule");
-  if(!events.length){ el.innerHTML='<div class="muted">На ближайшую неделю событий нет.</div>'; return; }
+  if(!events.length){ el.innerHTML='<div class="muted">No events in the next week.</div>'; return; }
   const byDay={};
   events.forEach(ev=>{ const s=evStart(ev); if(!s.date) return; const k=s.date.toISOString().slice(0,10); (byDay[k]=byDay[k]||[]).push({ev,s}); });
   const todayKey=new Date().toISOString().slice(0,10);
@@ -330,17 +386,17 @@ function renderSchedule(events){
   let html="";
   Object.keys(byDay).sort().forEach(k=>{
     const d=new Date(k+"T00:00:00");
-    const label = k===todayKey?"Сегодня" : k===tmrKey?"Завтра" : d.toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"});
+    const label = k===todayKey?"Today" : k===tmrKey?"Tomorrow" : d.toLocaleDateString("en-US",{weekday:"long",day:"numeric",month:"long"});
     html+='<div class="day-title">'+label+'</div>';
     byDay[k].sort((a,b)=>a.s.date-b.s.date).forEach(({ev,s})=>{
-      const time=s.allDay?"весь день":s.date.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});
+      const time=s.allDay?"all day":s.date.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
       const dom=DOMAINS[guessEventDomain(ev)];
       const loc=ev.location?esc(ev.location.split(",")[0]):"";
-      const meet=ev.conferenceUrl?'<a href="'+ev.conferenceUrl+'" target="_blank">видео ↗</a>':"";
+      const meet=ev.conferenceUrl?'<a href="'+ev.conferenceUrl+'" target="_blank">video ↗</a>':"";
       const meta=[loc,meet].filter(Boolean).join(" · ");
       html+='<div class="ev"><div class="time'+(s.allDay?" allday":"")+'">'+time+'</div>'+
             '<span class="dot" style="background:'+dom.dot+'"></span>'+
-            '<div><div class="summary">'+esc(ev.summary||"(без названия)")+'</div>'+
+            '<div><div class="summary">'+esc(ev.summary||"(no title)")+'</div>'+
             (meta?'<div class="meta">📍 '+meta+'</div>':'')+'</div></div>';
     });
   });

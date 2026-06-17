@@ -18,6 +18,9 @@ build/
 *.log
 npm-debug.log*
 
-# Прочее
+# Local secrets / config (keeps your n8n webhook URL out of the repo)
+app/config.js
+
+# Misc
 .cache/
 tmp/

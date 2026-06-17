@@ -1,28 +1,28 @@
-# Спека-промпт: Админка с ролями (v1)
+# Spec-prompt: Role-based admin panel (v1)
 
-> Это твой артефакт намерения (шаг 1 цикла). Верхний блок — для тебя, чтобы помнить *что и зачем проверяем*. Нижний блок («ПРОМПТ») — то, что копируешь целиком в v0 / Lovable.
-
----
-
-## Для меня (не вставлять в v0)
-
-**Проблема, которую проверяем:** разным ролям нужен разный рабочий стол. Хочу убедиться, что разделение по ролям читается и не мешает основному сценарию — обработке заявок.
-
-**Пользователи:** Админ (полный доступ), Менеджер (работает с заявками, без системных настроек).
-
-**Ключевой сценарий (его и проходим в превью):**
-1. Открываю экран логина, выбираю роль.
-2. Попадаю на рабочий стол со списком заявок.
-3. Открываю заявку, меняю статус.
-4. Возвращаюсь, выхожу, захожу под другой ролью — вижу, что доступно/скрыто иначе.
-
-**Критерий «прототип удался»:** за 30 секунд без подсказок видно, чем рабочий стол Админа отличается от Менеджера, и список заявок можно реально потрогать.
-
-**Что НЕ делаем в v1(осознанно режем):** реальную авторизацию, бэкенд, обычного пользователя и гостя, дашборд с графиками. Это следующие итерации.
+> This is your intent artifact (step 1 of the loop). The top block is for you — to remember *what and why you're testing*. The bottom block ("PROMPT") is what you copy whole into v0 / Lovable.
 
 ---
 
-## ПРОМПТ (копировать в v0 / Lovable целиком)
+## For me (don't paste into v0)
+
+**Problem being tested:** different roles need a different desk. I want to confirm the role split reads clearly and doesn't get in the way of the main scenario — handling requests.
+
+**Users:** Admin (full access), Manager (works with requests, no system settings).
+
+**Key scenario (the one we walk in the preview):**
+1. Open the login screen, pick a role.
+2. Land on a desk with a list of requests.
+3. Open a request, change its status.
+4. Go back, sign out, sign in as the other role — see what's available/hidden differently.
+
+**"Prototype succeeded" criterion:** within 30 seconds, with no hints, it's obvious how the Admin desk differs from the Manager one, and the request list can actually be touched.
+
+**Deliberately cut in v1:** real auth, a backend, regular user and guest roles, a charts dashboard. Those are later iterations.
+
+---
+
+## PROMPT (copy into v0 / Lovable whole)
 
 Build a role-based admin panel prototype. Use mock data, no backend.
 

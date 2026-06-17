@@ -1,49 +1,69 @@
-# Командный рабочий стол · Command Desk
+# Command Desk
 
-> Личный «командный пункт»: не пассивная витрина, а **движок задач**. Задачи прилетают из двух источников — я добавляю сам, или их генерят доменные AI-агенты, — и любую можно одним движением отправить реальным событием в Google Calendar.
+> A personal "command center": not a passive dashboard, but a **task engine**. Tasks arrive from two sources — I add them myself, or domain AI agents propose them — and any task can be pushed to Google Calendar as a real event in one move.
 
-Проект ведётся в рамках обучения **циклу быстрого прототипирования** (намерение → промпт → живой прототип → ревью → следующая итерация), не «через чат», а как это делают продвинутые AI PM.
+Built as part of learning the **rapid-prototyping loop** (intent → prompt → live prototype → review → next iteration), the way advanced AI PMs do it — not "through chat".
 
 ---
 
-## Что умеет прототип
+## What the prototype does
 
-- **Очередь задач.** Добавляю задачи вручную (домен угадывается по ключевым словам) или принимаю от агентов. Фильтр по доменам, отметка «сделано».
-- **AI-агенты.** Четыре доменных агента — 🔍 поиск работы, 💪 фитнес, 🏠 быт, 📚 проекты/учёба. Каждый смотрит на текущие задачи своего домена и предлагает 3 следующих шага (живой вызов модели).
-- **Запись в календарь.** У каждой задачи кнопка «📅 в календарь»: выбираю дату/время — создаётся **настоящее** событие в Google Calendar (свой цвет по домену).
-- **Живое расписание.** Блок «Что уже в календаре» читает ближайшие события из Google Calendar и группирует по дням.
-- **Сохранение.** Ручные задачи и фильтры хранятся локально в браузере.
+- **Task queue.** Add tasks manually (the domain is inferred from keywords) or accept them from agents. Filter by domain, mark done.
+- **AI agents.** Four domain agents — 🔍 Job search, 💪 Fitness & body, 🏠 Home, 📚 Projects & learning. Each looks at current tasks in its domain and proposes 3 next steps (a live model call).
+- **Push to calendar.** Each task has a "📅 to calendar" button: pick a date/time and a **real** event is created in Google Calendar (colored by domain).
+- **Live schedule.** The "Upcoming" block reads the next events from Google Calendar and groups them by day.
+- **Persistence.** Manual tasks and filters are stored locally in the browser.
 
-## Как это устроено
+## How it works
 
-Прототип — самодостаточная HTML-страница (`app/index.html`), которая работает как **живой артефакт Cowork** и обращается к подключённым сервисам через рантайм Cowork:
+The prototype is a self-contained HTML page (`app/index.html`) with a **backend-agnostic adapter**: the same buttons work through one of two backends.
 
-- `window.cowork.callMcpTool(...)` — чтение и запись Google Calendar (`list_events`, `create_event`);
-- `window.cowork.askClaude(...)` — генерация задач агентами.
+1. **Production mode (n8n).** In a browser, the desk sends `POST {action, ...}` to a single n8n workflow webhook. The workflow (`workflows/desk.workflow.json`) branches on `action`:
+   - `listEvents` / `createEvent` → Google Calendar (read & create events, OAuth on the n8n side);
+   - `agent` → Claude (Haiku) generates 3 tasks.
+   The webhook URL lives in `app/config.js` (gitignored — copy it from `app/config.example.js`). The Claude API key and Google OAuth never leave n8n.
+2. **Cowork mode.** Opened as a Cowork artifact (with `BACKEND` empty), calls go through the Cowork runtime: `window.cowork.callMcpTool(...)` (calendar) and `window.cowork.askClaude(...)` (agents).
 
-> ⚠️ Важно для демо: вне рантайма Cowork (если просто открыть `app/index.html` в браузере) вёрстка и логика задач работают, но вызовы календаря и агентов вернут ошибку — для них нужен хост Cowork с подключённым Google Calendar.
+> The Cowork sandbox blocks outbound network requests, so the **n8n version must be opened as a normal web page in a browser**, not inside the Cowork panel. That's exactly the "live prototype → real app" transition.
 
-## Структура
+## Structure
 
 ```
 .
-├── README.md              — этот файл
-├── CHANGELOG.md           — история версий
-├── DEVLOG.md              — дневник цикла прототипирования
+├── README.md              — this file
+├── CHANGELOG.md           — version history
+├── DEVLOG.md              — prototyping diary (how we thought)
 ├── app/
-│   └── index.html         — рабочий прототип (живой артефакт)
+│   └── index.html         — the working prototype (frontend)
+├── workflows/
+│   └── desk.workflow.json — backend: n8n workflow (importable, no secrets)
 └── docs/
-    ├── spec-admin-panel-v1.md   — учебный артефакт намерения (роль-админка)
-    └── spec-command-desk.md     — артефакт намерения + промпт текущей концепции
+    ├── spec-admin-panel-v1.md   — practice intent artifact (role-based admin)
+    ├── spec-command-desk.md     — intent artifact + prompt for the current concept
+    ├── n8n-setup.md             — building the production backend (what we actually built)
+    ├── make-setup.md            — alternative we considered: Make.com
+    └── sim-setup.md             — alternative we considered: Sim
 ```
 
-## Дорожная карта
+## Roadmap
 
-- [ ] Дизайн в Lovable → перенос стиля в прототип.
-- [ ] Агенты по расписанию (утренний автопрогон) вместо ручной кнопки.
-- [ ] Связь задача ↔ событие (редактирование и отмена из стола).
-- [ ] Шаринг стола с партнёром (роли — из учебного примера про админку).
+- [x] n8n backend: schedule, event creation, agents — on real data.
+- [ ] Host the desk on a public domain (currently opened as a local file in a browser).
+- [ ] Scheduled agents (a morning auto-run) instead of a manual button.
+- [ ] Task ↔ created-event link (edit / cancel from the desk).
+- [ ] Share the desk with a partner (roles — from the admin-panel practice example).
 
-## Стек
+## Run locally
 
-Чистый HTML/CSS/JS, без сборки. Интеграции — через Cowork (Google Calendar, вызов модели).
+```
+cp app/config.example.js app/config.js   # then put your n8n webhook URL in config.js
+open app/index.html                       # open in a normal browser
+```
+
+`config.js` is gitignored, so your webhook URL stays out of the repo. With no `config.js`, the desk falls back to the Cowork runtime.
+
+## Stack
+
+Frontend — plain HTML/CSS/JS, no build step. Backend — an **n8n** workflow (cloud): Google Calendar (OAuth) + Claude (Haiku) for agents. Inside Cowork the same frontend runs through the Cowork runtime.
+
+> Secrets stay out of the repo: the n8n webhook URL lives in the gitignored `app/config.js`; the Claude API key and Google OAuth are stored as credentials inside n8n and are never in these files (including the workflow export).
