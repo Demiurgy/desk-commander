@@ -1,4 +1,4 @@
-# Spec-prompt: Command Desk (current concept)
+# Spec-prompt: Desk Commander (current concept)
 
 > The intent artifact for the second prototype. The top block is for me (what I'm testing and why). The bottom block ("PROMPT") gets pasted whole into Lovable / v0.
 
@@ -30,7 +30,7 @@
 
 ## PROMPT (paste into Lovable / v0 whole)
 
-Build a personal "command desk" web app. Single page, light theme, calm warm-neutral palette (#f5f4f0 background, white cards, rounded 16px corners).
+Build a personal "Desk Commander" web app. Single page, light theme, calm warm-neutral palette (#f5f4f0 background, white cards, rounded 16px corners).
 
 **Concept:** a task engine, not a passive dashboard. Tasks arrive two ways — the user adds them, or domain AI agents generate them.
 

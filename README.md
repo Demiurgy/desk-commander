@@ -1,4 +1,4 @@
-# Command Desk
+# Desk Commander
 
 > A personal "command center": not a passive dashboard, but a **task engine**. Tasks arrive from two sources — I add them myself, or domain AI agents propose them — and any task can be pushed to Google Calendar as a real event in one move.
 
