@@ -1,5 +1,8 @@
 # Desk Commander
 
+<img width="1228" height="824" alt="Screenshot 2026-06-17 at 16 57 01" src="https://github.com/user-attachments/assets/d78e314d-bf2a-4cf0-b11e-e4d0c2a08777" />
+
+
 > A personal "command center": not a passive dashboard, but a **task engine**. Tasks arrive from two sources — I add them myself, or domain AI agents propose them — and any task can be pushed to Google Calendar as a real event in one move.
 
 Built as part of learning the **rapid-prototyping loop** (intent → prompt → live prototype → review → next iteration), the way advanced AI PMs do it — not "through chat".
