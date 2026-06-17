@@ -24,3 +24,6 @@ app/config.js
 # Misc
 .cache/
 tmp/
+
+DEVLOG.md
+CHANGELOG.md
