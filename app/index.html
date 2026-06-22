@@ -149,6 +149,34 @@ footer.note { text-align:center; color:var(--faint2); font-size:12px; margin-top
 .toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:var(--toast-bg); color:var(--toast-text); padding:10px 18px; border-radius:12px; font-size:14px; opacity:0; transition:.25s; pointer-events:none; z-index:50; }
 .toast.show { opacity:1; }
 
+/* tabs */
+.tabs{ display:flex; gap:6px; margin-bottom:16px; }
+.tab{ font:inherit; font-weight:600; font-size:14px; padding:8px 16px; border-radius:11px; cursor:pointer;
+  border:1px solid var(--border); background:var(--card); color:var(--muted); }
+.tab.active{ background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
+/* dashboard */
+.dsub{ font-size:12px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); margin:0 0 8px; }
+.dweek{ display:flex; gap:8px; align-items:flex-end; height:118px; }
+.dweek .col{ flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; height:100%; justify-content:flex-end; }
+.dweek .bar{ width:62%; min-height:3px; background:var(--accent); border-radius:6px 6px 0 0; }
+.dweek .dl{ font-size:11px; color:var(--muted); }
+.dweek .hv{ font-size:11px; color:var(--faint); font-variant-numeric:tabular-nums; min-height:14px; }
+.heat{ display:grid; grid-template-columns:auto repeat(7,1fr); gap:4px; align-items:center; }
+.heat .hh{ font-size:11px; color:var(--muted); text-align:center; }
+.heat .rl{ font-size:11px; color:var(--muted); padding-right:8px; white-space:nowrap; }
+.heat .cell{ height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:600; color:var(--text); }
+.catrow{ display:flex; align-items:center; gap:10px; padding:6px 0; }
+.catrow .cn{ width:96px; font-size:13px; font-weight:500; flex:0 0 auto; }
+.catrow .ctrack{ flex:1; height:10px; background:var(--line); border-radius:20px; overflow:hidden; }
+.catrow .cfill{ height:100%; border-radius:20px; }
+.catrow .cv{ font-size:12px; color:var(--faint); width:54px; text-align:right; font-variant-numeric:tabular-nums; }
+.review .ri{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:9px 0; border-top:1px solid var(--line); }
+.review .ri:first-child{ border-top:none; }
+.review .rt{ flex:1 1 200px; font-size:14px; }
+.review .cbtn{ font:inherit; font-size:11px; font-weight:600; cursor:pointer; border:1px solid var(--input-border); background:var(--pill-bg); color:var(--text); padding:4px 9px; border-radius:20px; }
+.review .cbtn:hover{ background:var(--card); }
+.hint{ font-size:14px; line-height:1.55; }
+
 @media (max-width:760px){ .topgrid { grid-template-columns:1fr; } .hello { font-size:36px; } }
 </style>
 </head>
@@ -166,6 +194,12 @@ footer.note { text-align:center; color:var(--faint2); font-size:12px; margin-top
 </div>
 
 <div class="wrap">
+  <div class="tabs">
+    <button class="tab active" id="tabDesk" onclick="setView('desk')">🗂 Desk</button>
+    <button class="tab" id="tabDash" onclick="setView('dashboard')">📊 Dashboard</button>
+  </div>
+
+  <div id="viewDesk">
 
   <!-- TOP: hero greeting/input (left) + schedule (right) -->
   <div class="topgrid">
@@ -198,6 +232,14 @@ footer.note { text-align:center; color:var(--faint2); font-size:12px; margin-top
   </div>
 
   <footer class="note">Tasks and agent output are saved in this browser. “To calendar” creates a real event in Google Calendar.</footer>
+  </div><!-- /viewDesk -->
+
+  <div id="viewDashboard" hidden>
+    <div class="card"><h2>📊 Load this week</h2><div id="dashLoad"></div></div>
+    <div class="card"><h2>🗂 Where time goes <span class="count" id="dashCatCount"></span></h2><div id="dashCats"></div></div>
+    <div class="card" id="dashReviewCard" hidden><h2>❓ Uncategorized — where do these go?</h2><div class="review" id="dashReview"></div></div>
+    <div class="card"><h2>💡 Balance</h2><div id="dashHints"></div></div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -228,6 +270,7 @@ const BACKEND = {
   listEvents:  CFG.listEvents || "",     // (optional) separate URLs if you build three workflows
   createEvent: CFG.createEvent || "",
   agent:       CFG.agent || "",
+  categorize:  CFG.categorize || "",     // (optional) LLM event-categorization endpoint; empty -> keyword classifier
   apiKey:      CFG.apiKey || ""          // n8n API key (only if the trigger has auth)
 };
 const inCowork = () => (typeof window!=="undefined" && window.cowork && window.cowork.callMcpTool);
@@ -313,6 +356,7 @@ const AGENTS = [
 
 /* state */
 let state = load();
+state.cats = state.cats || {};   // event-key -> category (cached classifications + manual fixes)
 function load(){ try { return Object.assign({tasks:[],filter:"all"}, JSON.parse(localStorage.getItem(LS)||"{}")); } catch(e){ return {tasks:[],filter:"all"}; } }
 function save(){ localStorage.setItem(LS, JSON.stringify(state)); }
 
@@ -499,6 +543,141 @@ function renderSchedule(events){
 
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 document.getElementById("newTask").addEventListener("keydown",e=>{ if(e.key==="Enter") addManual(); });
+
+/* ===================== DASHBOARD ===================== */
+const CATEGORIES = {
+  work:     {label:"Work",     color:"#2d6cdf"},
+  fitness:  {label:"Fitness",  color:"#2f8f46"},
+  health:   {label:"Health",   color:"#e0556e"},
+  social:   {label:"Social",   color:"#d98a2b"},
+  errands:  {label:"Errands",  color:"#b8860b"},
+  learning: {label:"Learning", color:"#7b53c9"},
+  rest:     {label:"Rest",     color:"#3aa6a0"},
+  uncategorized:{label:"Uncategorized", color:"#9aa0a6"}
+};
+const DAY_LABELS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const PART_LABELS=["Morning","Afternoon","Evening"];
+let dashEvents=[];
+
+function evKey(ev){ return ev.id || ((ev.summary||"")+"|"+((ev.start&&(ev.start.dateTime||ev.start.date))||"")); }
+function catGuess(ev){
+  const s=((ev.summary||"")+" "+(ev.location||"")).toLowerCase();
+  if(/interview|recruit|standup|meeting|sync|client|1:1|review|deadline|call|demo|project|sprint|work/.test(s)) return "work";
+  if(/gym|workout|run|yoga|stretch|train|cardio|mobility|swim|ride|walk|sport/.test(s)) return "fitness";
+  if(/doctor|dentist|therapy|vet|clinic|checkup|appointment|health|massage/.test(s)) return "health";
+  if(/lunch|dinner|coffee|party|meetup|drinks|date|friend|birthday|hangout|brunch/.test(s)) return "social";
+  if(/grocer|clean|laundry|errand|bank|pay|tax|repair|shopping|pick up|delivery|chore/.test(s)) return "errands";
+  if(/course|lesson|class|lecture|study|read|learn|module|tutorial|workshop|webinar/.test(s)) return "learning";
+  if(/rest|break|nap|relax|spa|day off|vacation|sleep|recovery/.test(s)) return "rest";
+  return "uncategorized";
+}
+function normalizeCats(d){
+  if(!d) return null;
+  const out={};
+  const arr=Array.isArray(d)?d:(d.events||d.items||d.map&&!Array.isArray(d.map)?null:d.map);
+  if(Array.isArray(arr)){ arr.forEach(x=>{ if(x&&x.key) out[x.key]=(x.category||x.cat||"").toLowerCase(); }); return out; }
+  if(d.map&&typeof d.map==="object") return d.map;
+  if(typeof d==="object" && !Array.isArray(d)){ const o={}; Object.keys(d).forEach(k=>o[k]=String(d[k]).toLowerCase()); return o; }
+  return null;
+}
+async function categorizeEvents(events){
+  const todo=events.filter(ev=>!state.cats[evKey(ev)]);
+  if(!todo.length) return;
+  let llm=null;
+  if(BACKEND.categorize){            // optional LLM upgrade (an n8n "categorize" branch)
+    try{
+      const cats=Object.keys(CATEGORIES).filter(c=>c!=="uncategorized");
+      const res=await fetch(BACKEND.categorize,{method:"POST",headers:simHeaders(),
+        body:JSON.stringify({categories:cats, events:todo.map(ev=>({key:evKey(ev),title:ev.summary||"",when:(ev.start&&(ev.start.dateTime||ev.start.date))||""}))})});
+      if(res.ok){ let d=await res.json().catch(()=>null); if(d&&d.output!==undefined)d=d.output; llm=normalizeCats(d); }
+    }catch(e){ llm=null; }
+  }
+  todo.forEach(ev=>{ const k=evKey(ev); let c=llm&&llm[k]; if(!c||!CATEGORIES[c]) c=catGuess(ev); state.cats[k]=c; });
+  save();
+}
+
+function setView(v){
+  document.getElementById("viewDesk").hidden = v!=="desk";
+  document.getElementById("viewDashboard").hidden = v!=="dashboard";
+  document.getElementById("tabDesk").classList.toggle("active", v==="desk");
+  document.getElementById("tabDash").classList.toggle("active", v==="dashboard");
+  if(v==="dashboard") renderDashboard();
+}
+
+async function renderDashboard(){
+  const load=document.getElementById("dashLoad"), catsEl=document.getElementById("dashCats"), hintsEl=document.getElementById("dashHints");
+  load.innerHTML='<div class="spinner">Analyzing your week…</div>'; catsEl.innerHTML=""; hintsEl.innerHTML="";
+  const start=new Date(); start.setHours(0,0,0,0);
+  const end=new Date(start); end.setDate(end.getDate()+7);
+  try { dashEvents=await apiListEvents(start.toISOString(), end.toISOString()); } catch(e){ dashEvents=[]; }
+  await categorizeEvents(dashEvents);
+
+  const timed=dashEvents.map(ev=>({ev,s:evStart(ev),e:evEnd(ev)})).filter(x=>x.s.date && !x.s.allDay);
+  const dayHours=[0,0,0,0,0,0,0];
+  const grid=[[0,0,0,0,0,0,0],[0,0,0,0,0,0,0],[0,0,0,0,0,0,0]];
+  const catHours={};
+  timed.forEach(x=>{ const d=x.s.date; const di=(d.getDay()+6)%7;
+    const hours=Math.max(0.25, ((x.e? (x.e-d):3600000)/3600000));
+    dayHours[di]+=hours; const pi=d.getHours()<12?0:d.getHours()<18?1:2; grid[pi][di]+=hours;
+    const c=state.cats[evKey(x.ev)]||"uncategorized"; catHours[c]=(catHours[c]||0)+hours; });
+
+  // by day
+  const maxDay=Math.max(1,...dayHours);
+  let lw='<div class="dsub">By day</div><div class="dweek">';
+  for(let i=0;i<7;i++){ const h=dayHours[i];
+    lw+='<div class="col"><div class="hv">'+(h?h.toFixed(1)+'h':'')+'</div><div class="bar" style="height:'+Math.round(h/maxDay*90)+'px"></div><div class="dl">'+DAY_LABELS[i]+'</div></div>'; }
+  lw+='</div>';
+  // by time of day (heatmap)
+  let maxCell=0; grid.forEach(r=>r.forEach(v=>{ if(v>maxCell)maxCell=v; })); maxCell=Math.max(1,maxCell);
+  lw+='<div class="dsub" style="margin-top:18px">By time of day</div><div class="heat"><div class="rl"></div>';
+  DAY_LABELS.forEach(d=>lw+='<div class="hh">'+d+'</div>');
+  for(let p=0;p<3;p++){ lw+='<div class="rl">'+PART_LABELS[p]+'</div>';
+    for(let i=0;i<7;i++){ const v=grid[p][i]; const a=v?(0.12+0.8*v/maxCell):0;
+      lw+='<div class="cell" style="background:rgba(63,130,214,'+a.toFixed(2)+')">'+(v?Math.round(v):'')+'</div>'; } }
+  lw+='</div>';
+  load.innerHTML=lw;
+
+  // category split
+  const totalH=Object.values(catHours).reduce((a,b)=>a+b,0);
+  document.getElementById("dashCatCount").textContent = totalH? totalH.toFixed(1)+"h total" : "";
+  if(!totalH){ catsEl.innerHTML='<div class="muted">No timed events this week.</div>'; }
+  else {
+    const order=Object.keys(CATEGORIES).filter(c=>catHours[c]).sort((a,b)=>catHours[b]-catHours[a]);
+    catsEl.innerHTML=order.map(c=>{ const h=catHours[c]; const pct=Math.round(h/totalH*100);
+      return '<div class="catrow"><span class="cn">'+CATEGORIES[c].label+'</span>'+
+        '<span class="ctrack"><span class="cfill" style="width:'+pct+'%;background:'+CATEGORIES[c].color+'"></span></span>'+
+        '<span class="cv">'+h.toFixed(1)+'h</span></div>'; }).join("");
+  }
+  renderReview();
+  hintsEl.innerHTML='<div class="hint">'+buildHints(dayHours,grid,catHours)+'</div>';
+}
+
+function renderReview(){
+  const card=document.getElementById("dashReviewCard"), box=document.getElementById("dashReview");
+  const un=dashEvents.filter(ev=>(state.cats[evKey(ev)]||"uncategorized")==="uncategorized");
+  if(!un.length){ card.hidden=true; box.innerHTML=""; return; }
+  card.hidden=false;
+  const cats=Object.keys(CATEGORIES).filter(c=>c!=="uncategorized");
+  box.innerHTML=un.map(ev=>{ const k=esc(evKey(ev)).replace(/'/g,"\\'");
+    return '<div class="ri"><span class="rt">'+esc(ev.summary||"(no title)")+'</span>'+
+      cats.map(c=>'<button class="cbtn" onclick="assignCat(\''+k+'\',\''+c+'\')">'+CATEGORIES[c].label+'</button>').join("")+'</div>'; }).join("");
+}
+function assignCat(key,cat){ state.cats[key]=cat; save(); renderDashboard(); }
+
+function buildHints(dayHours,grid,catHours){
+  const parts=[grid[0].reduce((a,b)=>a+b,0),grid[1].reduce((a,b)=>a+b,0),grid[2].reduce((a,b)=>a+b,0)];
+  const pn=["mornings","afternoons","evenings"];
+  const total=dayHours.reduce((a,b)=>a+b,0);
+  if(!total) return "Nothing scheduled this week — a clean slate. 🌤️";
+  const msgs=[];
+  msgs.push("Your <b>"+pn[parts.indexOf(Math.max(...parts))]+"</b> carry the most load — protect a little recovery around them.");
+  const maxD=Math.max(...dayHours), minD=Math.min(...dayHours);
+  if(maxD-minD>2) msgs.push("<b>"+DAY_LABELS[dayHours.indexOf(maxD)]+"</b> is your heaviest day and <b>"+DAY_LABELS[dayHours.indexOf(minD)]+"</b> is the lightest — consider shifting something over.");
+  let topCat=null,topH=0; Object.keys(catHours).forEach(c=>{ if(catHours[c]>topH){topH=catHours[c];topCat=c;} });
+  if(topCat&&topCat!=="uncategorized") msgs.push("<b>"+CATEGORIES[topCat].label+"</b> takes the most time ("+topH.toFixed(1)+"h) — is that the balance you want?");
+  return msgs.join(" ");
+}
+/* =================== /DASHBOARD ===================== */
 
 if(demoMode()){ document.querySelector("footer.note").textContent = "Demo mode — sample data. Agents & calendar are mocked; connect an n8n backend (see README) for the live version."; }
 renderAgents(); renderTasks(); loadSchedule();
