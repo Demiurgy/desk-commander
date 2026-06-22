@@ -459,9 +459,14 @@ function guessEventDomain(ev){
 }
 function renderSchedule(events){
   const el=document.getElementById("schedule");
-  if(!events.length){ el.innerHTML='<div class="muted">No events in the next week.</div>'; return; }
+  const LIMIT=6;
+  let items=events.map(ev=>({ev,s:evStart(ev)})).filter(x=>x.s.date);
+  if(!items.length){ el.innerHTML='<div class="muted">No events in the next week.</div>'; return; }
+  items.sort((a,b)=>a.s.date-b.s.date);
+  const total=items.length;
+  items=items.slice(0,LIMIT);                 // show only the soonest few so the panel stays compact
   const byDay={};
-  events.forEach(ev=>{ const s=evStart(ev); if(!s.date) return; const k=s.date.toISOString().slice(0,10); (byDay[k]=byDay[k]||[]).push({ev,s}); });
+  items.forEach(x=>{ const k=x.s.date.toISOString().slice(0,10); (byDay[k]=byDay[k]||[]).push(x); });
   const todayKey=new Date().toISOString().slice(0,10);
   const tmr=new Date(); tmr.setDate(tmr.getDate()+1); const tmrKey=tmr.toISOString().slice(0,10);
   let html="";
@@ -469,7 +474,7 @@ function renderSchedule(events){
     const d=new Date(k+"T00:00:00");
     const label = k===todayKey?"Today" : k===tmrKey?"Tomorrow" : d.toLocaleDateString("en-US",{weekday:"long",day:"numeric",month:"long"});
     html+='<div class="day-title">'+label+'</div>';
-    byDay[k].sort((a,b)=>a.s.date-b.s.date).forEach(({ev,s})=>{
+    byDay[k].forEach(({ev,s})=>{
       const time=s.allDay?"all day":s.date.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
       const dom=DOMAINS[guessEventDomain(ev)];
       const loc=ev.location?esc(ev.location.split(",")[0]):"";
@@ -481,6 +486,7 @@ function renderSchedule(events){
             (meta?'<div class="meta">📍 '+meta+'</div>':'')+'</div></div>';
     });
   });
+  if(total>LIMIT){ html+='<div class="muted">+ '+(total-LIMIT)+' more this week</div>'; }
   el.innerHTML=html;
 }
 
