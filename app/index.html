@@ -166,7 +166,8 @@ footer.note { text-align:center; color:var(--faint2); font-size:12px; margin-top
 .heat .rl{ font-size:11px; color:var(--muted); padding-right:8px; white-space:nowrap; }
 .heat .cell{ height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:600; color:var(--text); }
 .catrow{ display:flex; align-items:center; gap:10px; padding:6px 0; }
-.catrow .cn{ width:96px; font-size:13px; font-weight:500; flex:0 0 auto; }
+.catrow .cn{ width:104px; font-size:13px; font-weight:500; flex:0 0 auto; }
+.catrow .cn .cdot{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
 .catrow .ctrack{ flex:1; height:10px; background:var(--line); border-radius:20px; overflow:hidden; }
 .catrow .cfill{ height:100%; border-radius:20px; }
 .catrow .cv{ font-size:12px; color:var(--faint); width:54px; text-align:right; font-variant-numeric:tabular-nums; }
@@ -357,6 +358,7 @@ const AGENTS = [
 /* state */
 let state = load();
 state.cats = state.cats || {};   // event-key -> category (cached classifications + manual fixes)
+Object.keys(state.cats).forEach(k=>{ if(state.cats[k]==="fitness") state.cats[k]="health"; });   // fitness merged into health
 function load(){ try { return Object.assign({tasks:[],filter:"all"}, JSON.parse(localStorage.getItem(LS)||"{}")); } catch(e){ return {tasks:[],filter:"all"}; } }
 function save(){ localStorage.setItem(LS, JSON.stringify(state)); }
 
@@ -547,8 +549,8 @@ document.getElementById("newTask").addEventListener("keydown",e=>{ if(e.key==="E
 /* ===================== DASHBOARD ===================== */
 const CATEGORIES = {
   work:     {label:"Work",     color:"#2d6cdf"},
-  fitness:  {label:"Fitness",  color:"#2f8f46"},
-  health:   {label:"Health",   color:"#e0556e"},
+  health:   {label:"Health",   color:"#2f8f46"},
+  family:   {label:"Family",   color:"#e0556e"},
   social:   {label:"Social",   color:"#d98a2b"},
   errands:  {label:"Errands",  color:"#b8860b"},
   learning: {label:"Learning", color:"#7b53c9"},
@@ -560,11 +562,12 @@ const PART_LABELS=["Morning","Afternoon","Evening"];
 let dashEvents=[];
 
 function evKey(ev){ return ev.id || ((ev.summary||"")+"|"+((ev.start&&(ev.start.dateTime||ev.start.date))||"")); }
+function catOf(ev){ const c=state.cats[evKey(ev)]; return CATEGORIES[c]?c:"uncategorized"; }
 function catGuess(ev){
   const s=((ev.summary||"")+" "+(ev.location||"")).toLowerCase();
   if(/interview|recruit|standup|meeting|sync|client|1:1|review|deadline|call|demo|project|sprint|work/.test(s)) return "work";
-  if(/gym|workout|run|yoga|stretch|train|cardio|mobility|swim|ride|walk|sport/.test(s)) return "fitness";
-  if(/doctor|dentist|therapy|vet|clinic|checkup|appointment|health|massage/.test(s)) return "health";
+  if(/family|kids?|child|son|daughter|\bmom\b|\bdad\b|mother|father|parents|grandma|grandpa|wife|husband|anniversary/.test(s)) return "family";
+  if(/gym|workout|run|yoga|stretch|train|cardio|mobility|swim|ride|walk|sport|doctor|dentist|therapy|vet|clinic|checkup|appointment|health|massage/.test(s)) return "health";
   if(/lunch|dinner|coffee|party|meetup|drinks|date|friend|birthday|hangout|brunch/.test(s)) return "social";
   if(/grocer|clean|laundry|errand|bank|pay|tax|repair|shopping|pick up|delivery|chore/.test(s)) return "errands";
   if(/course|lesson|class|lecture|study|read|learn|module|tutorial|workshop|webinar/.test(s)) return "learning";
@@ -619,7 +622,7 @@ async function renderDashboard(){
   timed.forEach(x=>{ const d=x.s.date; const di=(d.getDay()+6)%7;
     const hours=Math.max(0.25, ((x.e? (x.e-d):3600000)/3600000));
     dayHours[di]+=hours; const pi=d.getHours()<12?0:d.getHours()<18?1:2; grid[pi][di]+=hours;
-    const c=state.cats[evKey(x.ev)]||"uncategorized"; catHours[c]=(catHours[c]||0)+hours; });
+    const c=catOf(x.ev); catHours[c]=(catHours[c]||0)+hours; });
 
   // by day
   const maxDay=Math.max(1,...dayHours);
@@ -644,7 +647,7 @@ async function renderDashboard(){
   else {
     const order=Object.keys(CATEGORIES).filter(c=>catHours[c]).sort((a,b)=>catHours[b]-catHours[a]);
     catsEl.innerHTML=order.map(c=>{ const h=catHours[c]; const pct=Math.round(h/totalH*100);
-      return '<div class="catrow"><span class="cn">'+CATEGORIES[c].label+'</span>'+
+      return '<div class="catrow"><span class="cn"><span class="cdot" style="background:'+CATEGORIES[c].color+'"></span>'+CATEGORIES[c].label+'</span>'+
         '<span class="ctrack"><span class="cfill" style="width:'+pct+'%;background:'+CATEGORIES[c].color+'"></span></span>'+
         '<span class="cv">'+h.toFixed(1)+'h</span></div>'; }).join("");
   }
@@ -654,13 +657,13 @@ async function renderDashboard(){
 
 function renderReview(){
   const card=document.getElementById("dashReviewCard"), box=document.getElementById("dashReview");
-  const un=dashEvents.filter(ev=>(state.cats[evKey(ev)]||"uncategorized")==="uncategorized");
+  const un=dashEvents.filter(ev=>catOf(ev)==="uncategorized");
   if(!un.length){ card.hidden=true; box.innerHTML=""; return; }
   card.hidden=false;
   const cats=Object.keys(CATEGORIES).filter(c=>c!=="uncategorized");
   box.innerHTML=un.map(ev=>{ const k=esc(evKey(ev)).replace(/'/g,"\\'");
     return '<div class="ri"><span class="rt">'+esc(ev.summary||"(no title)")+'</span>'+
-      cats.map(c=>'<button class="cbtn" onclick="assignCat(\''+k+'\',\''+c+'\')">'+CATEGORIES[c].label+'</button>').join("")+'</div>'; }).join("");
+      cats.map(c=>'<button class="cbtn" style="color:'+CATEGORIES[c].color+';border-color:'+CATEGORIES[c].color+'" onclick="assignCat(\''+k+'\',\''+c+'\')">'+CATEGORIES[c].label+'</button>').join("")+'</div>'; }).join("");
 }
 function assignCat(key,cat){ state.cats[key]=cat; save(); renderDashboard(); }
 
