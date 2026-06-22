@@ -450,6 +450,11 @@ function evStart(ev){
   if(ev.start&&ev.start.date) return {date:new Date(ev.start.date+"T00:00:00"),allDay:true};
   return {date:null,allDay:false};
 }
+function evEnd(ev){
+  if(ev.end&&ev.end.dateTime) return new Date(ev.end.dateTime);
+  if(ev.end&&ev.end.date) return new Date(ev.end.date+"T00:00:00");
+  return null;
+}
 function guessEventDomain(ev){
   const s=((ev.summary||"")+" "+(ev.location||"")).toLowerCase();
   if(/gym|workout|train|squat|stretch|run|yoga|sport|muscle|cardio|back|legs/.test(s)) return "fitness";
@@ -460,7 +465,9 @@ function guessEventDomain(ev){
 function renderSchedule(events){
   const el=document.getElementById("schedule");
   const LIMIT=6;
-  let items=events.map(ev=>({ev,s:evStart(ev)})).filter(x=>x.s.date);
+  const now=new Date();
+  let items=events.map(ev=>({ev,s:evStart(ev)})).filter(x=>x.s.date)
+    .filter(x=> x.s.allDay || ((evEnd(x.ev)||x.s.date) >= now));   // hide events that already ended
   if(!items.length){ el.innerHTML='<div class="muted">No events in the next week.</div>'; return; }
   items.sort((a,b)=>a.s.date-b.s.date);
   const total=items.length;
