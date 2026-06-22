@@ -1,6 +1,7 @@
 # Desk Commander
 
-<img width="1228" height="824" alt="Screenshot 2026-06-17 at 16 57 01" src="https://github.com/user-attachments/assets/d78e314d-bf2a-4cf0-b11e-e4d0c2a08777" />
+<img width="1196" height="811" alt="Screenshot 2026-06-22 at 21 16 34" src="https://github.com/user-attachments/assets/d8b7abf6-caae-492d-a6f4-629b9bfc3e6e" />
+<img width="1037" height="762" alt="Screenshot 2026-06-22 at 21 16 44" src="https://github.com/user-attachments/assets/c59cf7e2-e2d3-4111-8805-20b4f94fae03" />
 
 DEMO
 **▶ [Live demo](https://demiurgy.github.io/desk-commander/app/)** — sample data, no setup needed
